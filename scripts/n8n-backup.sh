@@ -138,6 +138,17 @@ restore_archive(){
   [ -f "$file" ] || { err "Archive not found: $file"; exit 1; }
 
   local sha="${file%.tar.gz}.sha256"
+  if [[ "${BACKUP_ENCRYPT:-no}" == "yes" && -n "${BACKUP_GPG_RECIPIENT:-}" ]]; then
+  gpg --batch --yes -r "$BACKUP_GPG_RECIPIENT" -o "$ARCHIVE.gpg" -e "$ARCHIVE" \
+    && shasum -a 256 "$ARCHIVE.gpg" > "$ARCHIVE.gpg.sha256" \
+    && rm -f "$ARCHIVE"
+  note "Encrypted archive: $ARCHIVE.gpg"
+  fi
+  need_bytes=$(tar -tzf "$ARCHIVE" | awk '{sum+=length($0)} END{print sum+104857600}') # rough +100MB
+  avail_bytes=$(df -PB1 "$APP_DIR" | awk 'NR==2{print $4}')
+  if (( avail_bytes < need_bytes )); then
+    fail "Not enough space to restore. Need ~$(numfmt --to=iec $need_bytes), have $(numfmt --to=iec $avail_bytes)"
+  fi
   if [ -f "$sha" ]; then
     say "Verifying checksum: $sha"
     if sha256sum -c "$sha"; then
@@ -174,3 +185,5 @@ esac
 
 say
 ok "Done."
+
+

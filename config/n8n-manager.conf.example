@@ -23,3 +23,17 @@ ENABLE_RATE_LIMIT="yes"
 ENABLE_BASIC_AUTH="no"
 ENABLE_AOP="no"
 LOCK_443_TO_CF="no"
+
+# Alerts
+ALERT_SLACK_WEBHOOK=""        # optional: Slack incoming webhook for failures
+ALERT_EMAIL_TO=""             # optional: local mail delivery must work (postfix/ssmtp/etc.)
+
+# Backups
+BACKUP_ENCRYPT="no"           # yes|no
+BACKUP_GPG_RECIPIENT=""       # email/key id for GPG encryption (if BACKUP_ENCRYPT=yes)
+
+# Docker
+PIN_DIGESTS="no"              # yes|no (pin images by digest for reproducibility)
+
+# Health
+DOCTOR_ON_BOOT="no"           # yes|no (enable a systemd timer to run doctor & alert if unhealthy)

@@ -147,3 +147,19 @@ You can keep backups and remove app data, NGINX site, and Docker stack.
 ## 9) Getting help
 
 - Open a GitHub Issue: describe OS version, commands run, and include sanitized logs from `/var/lib/n8n-manager/logs`.
+
+## 10) What to add
+What To Do?
+1- Doctor – sudo n8n-manager.sh --doctor (shows DNS/TLS/containers/disk/backup)
+2- Alerts – how to paste Slack webhook / email and what events trigger alerts
+3- Encrypted backups – how to set BACKUP_ENCRYPT=yes and BACKUP_GPG_RECIPIENT, how to decrypt
+4- SMTP wizard – where it lives (Customization menu) and a test mail example
+5- Restore preflight – mentions space check and dry-run idea
+6- Image pinning – explain PIN_DIGESTS=yes tradeoff (stability vs velocity)
+
+
+## 11) What to do when something breaks
+Run --doctor
+Check /var/lib/n8n-manager/logs
+Re-run n8n-security.sh --report-only
+docker compose ps and docker logs <service>

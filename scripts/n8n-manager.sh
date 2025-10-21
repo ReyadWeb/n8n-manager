@@ -70,6 +70,7 @@ menu(){
   say "  3) Customization — title, meta, logo, favicon; optional subpath"
   say "  4) Security — audit + guided hardening"
   say "  5) Backup — status / run / configure / restore"
+  say "  6) Doctor — check DNS, TLS, NGINX, and more"
   echo
   read -r -p "Enter 1-5 (q to quit): " CHOICE
   case "${CHOICE:-}" in
@@ -78,6 +79,7 @@ menu(){
     3) need_subscripts; run_with_log "$CUSTOMIZE" ;;
     4) need_subscripts; run_with_log "$SECURITY" ;;
     5) need_subscripts; run_with_log "$BACKUP" ;;
+    6) DOCTOR) clear; doctor; pause "Press Enter to return";;
     q|Q) echo "Bye!"; exit 0 ;;
     *) err "Invalid choice."; exit 1 ;;
   esac
@@ -95,5 +97,6 @@ case "$1" in
   --customize) shift; need_subscripts; run_with_log "$CUSTOMIZE" "$@" ;;
   --security) shift; need_subscripts; run_with_log "$SECURITY" "$@" ;;
   --backup) shift; need_subscripts; run_with_log "$BACKUP" "$@" ;;
+  --doctor) doctor; exit 0 ;;
   *) err "Unknown option: $1"; usage; exit 1 ;;
 esac

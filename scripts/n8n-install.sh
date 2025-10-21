@@ -125,6 +125,16 @@ if ! reached "dns_done"; then
 fi
 progress
 
+is_cf_proxied() {
+  curl -sI "http://$N8N_HOST" | grep -qi 'server: cloudflare'
+}
+if is_cf_proxied; then
+  info "Cloudflare proxy detected → recommend Cloudflare TLS mode."
+else
+  info "Direct A record detected → recommend Let's Encrypt."
+fi
+
+
 # 3) Base security & harden
 if ! reached "security_done"; then
   ensure_base_tools
@@ -266,3 +276,4 @@ else
   say "TLS: Let's Encrypt (auto). If it failed, re-issue with certbot once DNS/80 is correct."
 fi
 ok "Keep your encryption key (in .env) safe. First visit will create the n8n owner account."
+

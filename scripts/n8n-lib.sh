@@ -491,3 +491,72 @@ health_check(){
   curl -sI "https://${host}/healthz" | grep -q "200" && ok "HTTPS /healthz OK" || warn "HTTPS /healthz pending"
   set -e
 }
+
+
+doctor() {
+  local host="${N8N_HOST:-}"
+  header "n8n Manager Doctor"
+
+  section "DNS"
+  if [[ -n "$host" ]]; then
+    echo "Host: $host"
+    dig +short "$host" || true
+  else
+    warn "N8N_HOST not set."
+  fi
+
+  section "TLS"
+  if command -v openssl >/dev/null && [[ -n "$host" ]]; then
+    if echo | openssl s_client -connect "$host:443" -servername "$host" -verify_return_error 2>/dev/null \
+       | openssl x509 -noout -issuer -subject -dates >/tmp/certinfo.txt 2>/dev/null; then
+      cat /tmp/certinfo.txt
+    else
+      warn "Could not read certificate on $host:443"
+    fi
+  else
+    warn "openssl not available or host unset."
+  fi
+
+  section "NGINX"
+  sudo nginx -t || fail "nginx config test failed"
+
+  section "Ports"
+  ss -ltnp | awk 'NR==1 || /:22 |:80 |:443 |:5678 /{print}'
+
+  section "Docker containers"
+  docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+
+  section "Disk & Memory"
+  df -h /
+  free -h
+
+  section "Backups (latest 3)"
+  ls -1 "${BACKUP_DIR:-/var/backups/n8n}"/*.tar.gz 2>/dev/null | tail -n 3 || echo "(none found)"
+}
+
+# on backup failure
+alert "n8n Backup FAILED" "Host: $N8N_HOST at $(date)\nSee logs in $BACKUP_DIR."
+alert() { # alert "Subject" "Message"
+  local subj="$1"; shift
+  local msg="$*"
+  if [[ -n "${ALERT_SLACK_WEBHOOK:-}" ]]; then
+    curl -fsS -X POST -H 'Content-type: application/json' \
+      --data "{\"text\":\"*${subj}*\\n${msg}\"}" \
+      "$ALERT_SLACK_WEBHOOK" >/dev/null || true
+  fi
+  if [[ -n "${ALERT_EMAIL_TO:-}" ]]; then
+    printf "%s\n" "$msg" | mail -s "$subj" "$ALERT_EMAIL_TO" || true
+  fi
+}
+
+
+pin_image() { # pin_image service image repo tag
+  local svc="$1" img="$2" repo="$3" tag="$4"
+  local digest
+  digest=$(docker pull "$repo:$tag" --quiet >/dev/null 2>&1; docker inspect --format='{{index .RepoDigests 0}}' "$repo:$tag")
+  [[ -n "$digest" ]] || fail "Could not resolve digest for $repo:$tag"
+  sed -i "s#image: $img#image: $digest#g" "$APP_DIR/docker-compose.yml"
+  note "Pinned $svc to $digest"
+}
+
+pin_image "n8n" "n8nio/n8n:latest" "n8nio/n8n" "latest"

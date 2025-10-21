@@ -253,3 +253,31 @@ say "Meta:   $META"
 [ -n "$FAV_PATH" ] && say "Favicon:$FAV_PATH" || say "Favicon:(unchanged)"
 ok "Customization applied."
 say "Open: https://${N8N_HOST}/ $( [ "$WANT_SUBPATH" = "yes" ] && echo '(landing) → /n8n/' )"
+
+
+smtp_wizard() {
+  header "SMTP setup for n8n"
+  read -rp "SMTP host: " SMTP_HOST
+  read -rp "SMTP port [587]: " SMTP_PORT; SMTP_PORT="${SMTP_PORT:-587}"
+  read -rp "SMTP user: " SMTP_USER
+  read -rsp "SMTP password: " SMTP_PASS; echo
+  read -rp "From email (e.g., ops@example.com): " SMTP_FROM
+
+  ensure_env_kv "N8N_SMTP_HOST" "$SMTP_HOST"
+  ensure_env_kv "N8N_SMTP_PORT" "$SMTP_PORT"
+  ensure_env_kv "N8N_SMTP_USER" "$SMTP_USER"
+  ensure_env_kv "N8N_SMTP_PASS" "$SMTP_PASS"
+  ensure_env_kv "N8N_SMTP_SENDER" "$SMTP_FROM"
+  note ".env updated. Restarting n8n…"
+  (cd "$APP_DIR" && docker compose up -d n8n) || fail "Restart failed"
+
+  # quick test email using swaks if present
+  if command -v swaks >/dev/null; then
+    read -rp "Test recipient email: " TEST_TO
+    swaks --server "$SMTP_HOST:$SMTP_PORT" --auth-user "$SMTP_USER" --auth-password "$SMTP_PASS" \
+          --from "$SMTP_FROM" --to "$TEST_TO" --tls --body "Hello from n8n Manager SMTP test." || warn "swaks test failed"
+  else
+    info "Install 'swaks' for test mails: sudo apt-get install -y swaks"
+  fi
+}
+
