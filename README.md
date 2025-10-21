@@ -49,9 +49,12 @@ wget -qO- https://raw.githubusercontent.com/ReyadWeb/n8n-manager/main/tools/boot
 
 ## Docs
 - [docs/QUICKSTART.md](docs/QUICKSTART.md)
+- [User Guide](docs/USER_GUIDE.md)
+- [Project / Code Guide](docs/PROJECT_GUIDE.md)
 - [docs/SECURITY.md](docs/SECURITY.md)
 - [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md)
 - [TEAM_GUIDE.md](TEAM_GUIDE.md)
+
 
 ## License
 MIT — see [LICENSE](LICENSE).
