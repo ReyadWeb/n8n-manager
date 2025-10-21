@@ -1,0 +1,26 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+
+# Node/Python extras
+node_modules/
+__pycache__/
+
+# Build artifacts
+dist/
+*.tar.gz
+
+# Runtime secrets & state (never commit)
+.env
+.env.*
+/opt/
+/var/lib/n8n-manager/
+/var/backups/n8n/
+*.sha256
+
+# Local machine config copy
+/config/n8n-manager.conf

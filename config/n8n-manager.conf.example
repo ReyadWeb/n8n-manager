@@ -1,0 +1,25 @@
+# n8n Manager — Generic Config (template, no secrets)
+
+PUBLIC_IP="203.0.113.10"
+N8N_HOST="n8n.example.com"
+TLS_MODE="auto"                  # auto | cloudflare | lets-encrypt
+TIMEZONE="America/New_York"
+
+APP_DIR="/opt/n8n"
+NGINX_SITE="/etc/nginx/sites-available/n8n"
+NGINX_SITE_LINK="/etc/nginx/sites-enabled/n8n"
+CLOUDFLARE_SSL_DIR="/etc/ssl/cloudflare"
+
+ENABLE_SUBPATH="yes"
+SITE_TITLE="Ops Console"
+SITE_META="Automation console."
+SITE_STATIC_DIR="/var/www/n8n.example.com"
+
+BACKUP_DIR="/var/backups/n8n"
+BACKUP_CRON_TIME="03:17"
+BACKUP_RETENTION="7"
+
+ENABLE_RATE_LIMIT="yes"
+ENABLE_BASIC_AUTH="no"
+ENABLE_AOP="no"
+LOCK_443_TO_CF="no"
