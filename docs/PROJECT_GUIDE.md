@@ -146,9 +146,9 @@ DOCTOR_ON_BOOT="no"               # yes|no (systemd timer can run doctor & alert
 - For releases, tag versions and pin bootstrap installs to tags for reproducibility.
 
 
-# Operational Playbooks
+## Operational
 
-## Health check
+# Health check
 sudo n8n-manager.sh --doctor
 # or:
 sudo n8n-security.sh --report-only
@@ -165,7 +165,7 @@ sudo n8n-manager.sh --backup --run-now
 sudo n8n-manager.sh --backup --configure 03:17 --retention 7
 sudo n8n-manager.sh --backup --restore /var/backups/n8n/n8n-YYYYmmdd_HHMMSS.tar.gz
 
-## Optional encryption: set BACKUP_ENCRYPT="yes" and BACKUP_GPG_RECIPIENT.
+# Optional encryption: set BACKUP_ENCRYPT="yes" and BACKUP_GPG_RECIPIENT.
 
 # Customization / Subpath
 sudo n8n-manager.sh --customize --enable-subpath \
@@ -178,6 +178,18 @@ sudo n8n-manager.sh --customize --enable-subpath \
 # Alerts
 - Set ALERT_SLACK_WEBHOOK (and/or ALERT_EMAIL_TO) in /etc/n8n-manager.conf.
 - Scripts send alerts on backup/TLS/doctor failures.11
+
+
+
+## Quick validation after install
+# One-shot health report
+sudo n8n-manager.sh --doctor
+
+# Optional SMTP setup + test
+sudo n8n-manager.sh --customize   # choose SMTP wizard in the menu (if you enabled it)
+
+# Backup configuration
+sudo n8n-manager.sh --backup --status
 
 # FAQ 
 Q: Can I run without Cloudflare?
