@@ -32,8 +32,8 @@ STATE_FILE="$STATE_DIR/state"
 
 ensure_dirs(){ mkdir -p "$STATE_DIR" "$LOG_DIR"; }
 
+# defaults if CFG is missing or sparse (generic, no secrets)
 load_cfg_defaults(){
-  # defaults if CFG is missing or sparse (generic, no secrets)
   PUBLIC_IP="${PUBLIC_IP:-203.0.113.10}"
   N8N_HOST="${N8N_HOST:-n8n.example.com}"
   TLS_MODE="${TLS_MODE:-auto}"
@@ -55,12 +55,20 @@ load_cfg_defaults(){
   LOCK_443_TO_CF="${LOCK_443_TO_CF:-no}"
 }
 
+# immediate safe fallbacks so strict mode doesn't break
+# (these protect us even if someone forgets to call load_cfg)
+: "${N8N_HOST:=n8n.example.com}"
+: "${BACKUP_DIR:=/var/backups/n8n}"
+
 load_cfg(){
   ensure_dirs
+  # 1) load defaults first
+  load_cfg_defaults
+  # 2) then let user config override
   if [ -f "$CFG_FILE" ]; then
+    # shellcheck source=/etc/n8n-manager.conf
     . "$CFG_FILE"
   fi
-  load_cfg_defaults
 }
 
 save_cfg_kv(){ # save or replace KEY=VALUE in CFG_FILE
@@ -347,36 +355,6 @@ cf_unlock_443(){
   ok "Cloudflare 443 lock removed"
 }
 
-# =============[ NGINX extras ]=============
-nginx_enable_basic_auth(){
-  local site="$1" user="${2:-admin}" htfile="${3:-/etc/nginx/.n8n_htpasswd}"
-  apt -y install apache2-utils >/dev/null 2>&1 || true
-  if [ ! -f "$htfile" ]; then
-    htpasswd -c "$htfile" "$user"
-  else
-    htpasswd "$htfile" "$user"
-  fi
-  awk '
-    /location \// && !x {print; print "    auth_basic \"Restricted\";\n    auth_basic_user_file '"$htfile"';"; x=1; next}
-    {print}
-  ' "$site" > "${site}.tmp" && mv "${site}.tmp" "$site"
-  nginx -t && systemctl reload nginx
-  ok "Basic Auth enabled for editor (user: $user)"
-}
-
-nginx_enable_rate_limit(){
-  local site="$1"
-  if ! grep -q "limit_req_zone.*rl_api" /etc/nginx/nginx.conf; then
-    sed -i 's|http {|http {\n    limit_req_zone $binary_remote_addr zone=rl_api:10m rate=10r/s;|' /etc/nginx/nginx.conf
-  fi
-  awk '
-    /location \// && !x {print; print "  location /webhook/ {\n    limit_req zone=rl_api burst=40 nodelay;\n    proxy_pass http://127.0.0.1:5678/webhook/;\n    proxy_set_header Host $host;\n    proxy_set_header X-Forwarded-Proto $scheme;\n  }\n"; x=1; next}
-    {print}
-  ' "$site" > "${site}.tmp" && mv "${site}.tmp" "$site"
-  nginx -t && systemctl reload nginx
-  ok "Rate-limit enabled for /webhook/"
-}
-
 # =============[ Customization ]=============
 download_asset(){
   local url="$1" accept_regex="$2" dest_noext="$3" max_bytes=$((5*1024*1024))
@@ -492,50 +470,41 @@ health_check(){
   set -e
 }
 
-
 doctor() {
+  # lightweight version (your previous one used header/section/fail/note which weren't defined)
   local host="${N8N_HOST:-}"
-  header "n8n Manager Doctor"
+  h1 "n8n Manager Doctor"
 
-  section "DNS"
+  say "DNS:"
   if [[ -n "$host" ]]; then
-    echo "Host: $host"
+    say "  Host: $host"
     dig +short "$host" || true
   else
-    warn "N8N_HOST not set."
+    warn "  N8N_HOST not set."
   fi
 
-  section "TLS"
-  if command -v openssl >/dev/null && [[ -n "$host" ]]; then
-    if echo | openssl s_client -connect "$host:443" -servername "$host" -verify_return_error 2>/dev/null \
-       | openssl x509 -noout -issuer -subject -dates >/tmp/certinfo.txt 2>/dev/null; then
-      cat /tmp/certinfo.txt
-    else
-      warn "Could not read certificate on $host:443"
-    fi
+  say "NGINX test:"
+  if command -v nginx >/dev/null 2>&1; then
+    sudo nginx -t || err "nginx config test failed"
   else
-    warn "openssl not available or host unset."
+    warn "  nginx not installed"
   fi
 
-  section "NGINX"
-  sudo nginx -t || fail "nginx config test failed"
-
-  section "Ports"
+  say "Ports (22,80,443,5678):"
   ss -ltnp | awk 'NR==1 || /:22 |:80 |:443 |:5678 /{print}'
 
-  section "Docker containers"
-  docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+  say "Docker containers:"
+  docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' || true
 
-  section "Disk & Memory"
-  df -h /
-  free -h
+  say "Disk & Memory:"
+  df -h / || true
+  free -h || true
 
-  section "Backups (latest 3)"
+  say "Backups (latest 3):"
   ls -1 "${BACKUP_DIR:-/var/backups/n8n}"/*.tar.gz 2>/dev/null | tail -n 3 || echo "(none found)"
 }
 
-# on backup failure
-alert "n8n Backup FAILED" "Host: $N8N_HOST at $(date)\nSee logs in $BACKUP_DIR."
+# =============[ Alerts ]=============
 alert() { # alert "Subject" "Message"
   local subj="$1"; shift
   local msg="$*"
@@ -549,14 +518,15 @@ alert() { # alert "Subject" "Message"
   fi
 }
 
-
+# =============[ Image pinning ]=============
 pin_image() { # pin_image service image repo tag
   local svc="$1" img="$2" repo="$3" tag="$4"
   local digest
   digest=$(docker pull "$repo:$tag" --quiet >/dev/null 2>&1; docker inspect --format='{{index .RepoDigests 0}}' "$repo:$tag")
-  [[ -n "$digest" ]] || fail "Could not resolve digest for $repo:$tag"
+  [[ -n "$digest" ]] || err "Could not resolve digest for $repo:$tag"
   sed -i "s#image: $img#image: $digest#g" "$APP_DIR/docker-compose.yml"
-  note "Pinned $svc to $digest"
+  ok "Pinned $svc to $digest"
 }
 
-pin_image "n8n" "n8nio/n8n:latest" "n8nio/n8n" "latest"
+# (removed the stray call):
+# pin_image "n8n" "n8nio/n8n:latest" "n8nio/n8n" "latest"
