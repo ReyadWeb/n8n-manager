@@ -5,18 +5,21 @@ set -euo pipefail
 
 LIB="/usr/local/sbin/n8n-lib.sh"
 [ -f "$LIB" ] || { echo "Missing library: $LIB (run Step 2 first)"; exit 1; }
+# shellcheck source=/usr/local/sbin/n8n-lib.sh
 . "$LIB"
 
+# load config and make sure dirs exist
 load_cfg
 ensure_dirs
 
+# sub-scripts (installed by bootstrap)
 INSTALL="/usr/local/sbin/n8n-install.sh"
 RESET="/usr/local/sbin/n8n-reset.sh"
 CUSTOMIZE="/usr/local/sbin/n8n-customize.sh"
 SECURITY="/usr/local/sbin/n8n-security.sh"
 BACKUP="/usr/local/sbin/n8n-backup.sh"
 
-need_subscripts(){
+need_subscripts() {
   local missing=()
   for f in "$INSTALL" "$RESET" "$CUSTOMIZE" "$SECURITY" "$BACKUP"; do
     [ -x "$f" ] || missing+=("$f")
@@ -29,18 +32,18 @@ need_subscripts(){
   fi
 }
 
-print_header(){
+print_header() {
   clear
   h1 "n8n Manager"
   say "Config: $(COLOR '1;37' "$CFG_FILE")"
-  say "Host:   $(COLOR '1;37' "$N8N_HOST")"
-  say "IP:     $(COLOR '1;37' "$PUBLIC_IP")"
-  say "TZ:     $(COLOR '1;37' "$TIMEZONE")"
+  say "Host:   $(COLOR '1;37' "${N8N_HOST:-not-set}")"
+  say "IP:     $(COLOR '1;37' "${PUBLIC_IP:-unknown}")"
+  say "TZ:     $(COLOR '1;37' "${TIMEZONE:-UTC}")"
   echo
 }
 
-usage(){
-cat <<USAGE
+usage() {
+  cat <<USAGE
 n8n-manager — Main menu / CLI
 
 Menu:
@@ -52,17 +55,23 @@ CLI:
   --customize [--title TEXT] [--meta TEXT] [--logo-url URL] [--favicon-url URL] [--enable-subpath|--disable-subpath] [--non-interactive]
   --security [--apply-all|--report-only]
   --backup --status | --run-now | --configure HH:MM [--retention N] | --restore /path/file.tar.gz
+  --doctor
 USAGE
 }
 
-run_with_log(){
+run_with_log() {
   local script="$1"; shift
   local log; log="$(log_file)"
   say "Logging to: $log"
+  # shellcheck disable=SC2068
   "$script" $@ 2>&1 | tee "$log"
 }
 
-menu(){
+pause() {
+  read -r -p "Press Enter to return to menu..." _
+}
+
+menu() {
   print_header
   say "Choose an action:"
   say "  1) Install — reset first, then fresh hardened install"
@@ -72,31 +81,87 @@ menu(){
   say "  5) Backup — status / run / configure / restore"
   say "  6) Doctor — check DNS, TLS, NGINX, and more"
   echo
-  read -r -p "Enter 1-5 (q to quit): " CHOICE
+  read -r -p "Enter 1-6 (q to quit): " CHOICE
   case "${CHOICE:-}" in
-    1) need_subscripts; run_with_log "$INSTALL" ;;
-    2) need_subscripts; run_with_log "$RESET" ;;
-    3) need_subscripts; run_with_log "$CUSTOMIZE" ;;
-    4) need_subscripts; run_with_log "$SECURITY" ;;
-    5) need_subscripts; run_with_log "$BACKUP" ;;
-    6) DOCTOR) clear; doctor; pause "Press Enter to return";;
-    q|Q) echo "Bye!"; exit 0 ;;
-    *) err "Invalid choice."; exit 1 ;;
+    1)
+      need_subscripts
+      run_with_log "$INSTALL"
+      ;;
+    2)
+      need_subscripts
+      run_with_log "$RESET"
+      ;;
+    3)
+      need_subscripts
+      run_with_log "$CUSTOMIZE"
+      ;;
+    4)
+      need_subscripts
+      run_with_log "$SECURITY"
+      ;;
+    5)
+      need_subscripts
+      run_with_log "$BACKUP"
+      ;;
+    6)
+      clear
+      doctor
+      pause
+      ;;
+    q|Q)
+      echo "Bye!"
+      exit 0
+      ;;
+    *)
+      err "Invalid choice."
+      exit 1
+      ;;
   esac
 }
 
+# ----- CLI entry -----
 if [ $# -eq 0 ]; then
   menu
   exit 0
 fi
 
 case "$1" in
-  -h|--help) usage; exit 0 ;;
-  --install) shift; need_subscripts; run_with_log "$INSTALL" "$@" ;;
-  --reset) shift; need_subscripts; run_with_log "$RESET" "$@" ;;
-  --customize) shift; need_subscripts; run_with_log "$CUSTOMIZE" "$@" ;;
-  --security) shift; need_subscripts; run_with_log "$SECURITY" "$@" ;;
-  --backup) shift; need_subscripts; run_with_log "$BACKUP" "$@" ;;
-  --doctor) doctor; exit 0 ;;
-  *) err "Unknown option: $1"; usage; exit 1 ;;
+  -h|--help)
+    usage
+    exit 0
+    ;;
+  --install)
+    shift
+    need_subscripts
+    run_with_log "$INSTALL" "$@"
+    ;;
+  --reset)
+    shift
+    need_subscripts
+    run_with_log "$RESET" "$@"
+    ;;
+  --customize)
+    shift
+    need_subscripts
+    run_with_log "$CUSTOMIZE" "$@"
+    ;;
+  --security)
+    shift
+    need_subscripts
+    run_with_log "$SECURITY" "$@"
+    ;;
+  --backup)
+    shift
+    need_subscripts
+    run_with_log "$BACKUP" "$@"
+    ;;
+  --doctor)
+    doctor
+    exit 0
+    ;;
+  *)
+    err "Unknown option: $1"
+    usage
+    exit 1
+    ;;
 esac
